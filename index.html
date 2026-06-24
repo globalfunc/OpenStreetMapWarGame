@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Invasion of the Vatican</title>
+    <style>
+      :root {
+        --bg: #eef2f5;
+        --italy: #2563b0;
+        --vatican: #e8c61e;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: var(--bg);
+        color: #222;
+      }
+      #stage { position: fixed; inset: 0; }
+      #board {
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none; /* let us handle pan/zoom gestures */
+      }
+
+      /* --- Minimal HUD overlay (container for later phases) --- */
+      #hud {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.88);
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+        font-size: 13px;
+        user-select: none;
+        max-width: 220px;
+      }
+      #hud h1 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      #hud .hint { color: #555; font-size: 12px; }
+      #hud .row { display: flex; gap: 6px; }
+      #hud button {
+        border: 0;
+        border-radius: 6px;
+        padding: 5px 10px;
+        background: var(--italy);
+        color: #fff;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      #hud .attrib { color: #888; font-size: 10px; }
+      #legend {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 3px 8px;
+        font-size: 12px;
+      }
+      .sw {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+        border: 1px solid rgba(0, 0, 0, 0.15);
+      }
+      #status {
+        font-weight: 600;
+        font-size: 12px;
+        color: #333;
+      }
+
+      /* --- Setup panel (Phase 2: drag-and-drop placement) --- */
+      #setup {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px 14px;
+        width: 210px;
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+        font-size: 13px;
+        user-select: none;
+      }
+      #setup.hidden { display: none; }
+      #setup h2 { margin: 0; font-size: 14px; }
+      .tray {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 8px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+      }
+      .tray .tray-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #666; }
+      .tray.active { border-color: #444; background: rgba(0, 0, 0, 0.03); }
+      #tray-italy .tray-title { color: var(--italy); }
+      #tray-vatican .tray-title { color: var(--vatican); }
+      .chip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        background: #f1ede3;
+        cursor: grab;
+        touch-action: none;
+      }
+      .chip.disabled { opacity: 0.4; pointer-events: none; cursor: default; }
+      .chip .icon {
+        width: 22px;
+        height: 22px;
+        flex: 0 0 auto;
+      }
+      .chip .name { flex: 1; }
+      .chip .count {
+        font-weight: 700;
+        min-width: 20px;
+        text-align: right;
+      }
+      #start-btn {
+        border: 0;
+        border-radius: 8px;
+        padding: 9px 12px;
+        background: #2e7d32;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      #start-btn:disabled { background: #b9c2b9; cursor: not-allowed; }
+      #setup-msg { min-height: 16px; font-size: 12px; color: #b23b3b; }
+
+      /* --- Play panel (Phase 3: turn flow) --- */
+      #play {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px 14px;
+        width: 210px;
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+        font-size: 13px;
+        user-select: none;
+      }
+      #play.hidden { display: none; }
+      #play h2 { margin: 0; font-size: 14px; }
+      #play .turn { font-size: 13px; }
+      #play .turn b { font-size: 15px; }
+      #sel-info { font-size: 12px; color: #444; min-height: 30px; }
+
+      /* --- Army boxes (Phase 8 Part C): live per-side soldier/tank counts --- */
+      .army-boxes { display: flex; gap: 8px; }
+      .army-box {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        background: rgba(0, 0, 0, 0.04);
+        font-size: 12px;
+      }
+      .army-box[data-side="italy"] { border-color: rgba(37, 99, 176, 0.5); }
+      .army-box[data-side="vatican"] { border-color: rgba(232, 198, 30, 0.6); }
+      .army-box.active { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.18); background: rgba(0, 0, 0, 0.07); }
+      .army-box .abox-side { font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+      .army-box[data-side="italy"] .abox-side { color: var(--italy); }
+      .army-box[data-side="vatican"] .abox-side { color: #b89500; }
+      .army-box .abox-stat { display: inline-flex; align-items: center; gap: 3px; }
+      .army-box .abox-stat b { font-weight: 800; }
+      .army-box .abox-total { margin-left: auto; font-weight: 800; opacity: 0.65; }
+      .army-box .ico { width: 13px; height: 13px; flex: 0 0 auto; border: 1px solid rgba(0,0,0,0.3); }
+      .army-box[data-side="italy"] .ico { background: var(--italy); }
+      .army-box[data-side="vatican"] .ico { background: var(--vatican); }
+      .army-box .ico.soldier { border-radius: 50%; }
+      .army-box .ico.tank { border-radius: 3px; }
+
+      /* --- Wheel of Fortune (Phase 4, spec §5) --- */
+      #wheel { align-self: center; display: block; }
+      #wheel-result {
+        min-height: 18px;
+        font-size: 13px;
+        font-weight: 700;
+        text-align: center;
+      }
+      #wheel-btn {
+        border: 0;
+        border-radius: 8px;
+        padding: 9px 12px;
+        background: #9aa0a6;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.15s, filter 0.15s;
+      }
+      #wheel-btn:disabled { background: #c2c6cb; cursor: not-allowed; }
+      /* Enabled + waiting to be spun: flash in the current player's color. */
+      #wheel-btn.flashing {
+        background: var(--flash, var(--italy));
+        animation: wheelflash 0.9s ease-in-out infinite;
+      }
+      @keyframes wheelflash {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); filter: brightness(1); }
+        50% { box-shadow: 0 0 0 6px var(--flashglow, rgba(37, 99, 176, 0.28)); filter: brightness(1.18); }
+      }
+      #skip-btn {
+        border: 0;
+        border-radius: 8px;
+        padding: 9px 12px;
+        background: #6b7280;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      #skip-btn:hover { background: #565d68; }
+
+      /* --- Toast (Phase 3: rejected-click feedback, spec §8.1) --- */
+      #toast {
+        position: fixed;
+        left: 50%;
+        bottom: 36px;
+        transform: translate(-50%, 12px);
+        padding: 10px 18px;
+        background: rgba(30, 24, 16, 0.92);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: 22px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 80;
+      }
+      #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+      /* Pointer-following drag ghost */
+      .ghost {
+        position: fixed;
+        width: 26px;
+        height: 26px;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+        z-index: 60;
+        border: 2px solid rgba(0, 0, 0, 0.55);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      }
+      .ghost.soldier { border-radius: 50%; }
+      .ghost.tank { border-radius: 5px; }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <canvas id="board"></canvas>
+    </div>
+
+    <div id="hud">
+      <h1>Invasion of the Vatican</h1>
+      <div id="status">Setup — Italy places (anywhere)</div>
+      <div class="hint">Drag tray units onto the board · drag to pan · scroll to zoom · <b>G</b> = grid</div>
+      <div id="legend">
+        <span class="sw" style="background:#fdfaf2;border-color:#d7cbab"></span><span>Street / plaza</span>
+        <span class="sw" style="background:#bfe09a"></span><span>Garden</span>
+        <span class="sw" style="background:#f1d886"></span><span>Basilica / church</span>
+        <span class="sw" style="background:#e6dcc7"></span><span>Building</span>
+        <span class="sw" style="background:#9a8a6f"></span><span>Wall</span>
+        <span class="sw" style="background:#a7d6ec"></span><span>Water</span>
+      </div>
+      <div class="row">
+        <button id="reset-view">Reset view</button>
+        <button id="toggle-grid">Grid</button>
+        <button id="new-game-btn" title="Clear the saved game and start over">New Game</button>
+      </div>
+      <div class="attrib">Map data © OpenStreetMap contributors (ODbL)</div>
+    </div>
+
+    <div id="setup">
+      <h2>Deploy your armies</h2>
+      <div class="tray" id="tray-italy">
+        <span class="tray-title">Italy — attackers</span>
+        <div class="chip" id="chip-italy-soldier">
+          <span class="icon" style="background:var(--italy);border-radius:50%"></span>
+          <span class="name">Soldier</span>
+          <span class="count">0</span>
+        </div>
+        <div class="chip" id="chip-italy-tank">
+          <span class="icon" style="background:var(--italy);border-radius:4px"></span>
+          <span class="name">Tank</span>
+          <span class="count">0</span>
+        </div>
+      </div>
+      <div class="tray" id="tray-vatican">
+        <span class="tray-title">Vatican — defenders</span>
+        <div class="chip" id="chip-vatican-soldier">
+          <span class="icon" style="background:var(--vatican);border-radius:50%"></span>
+          <span class="name">Soldier</span>
+          <span class="count">0</span>
+        </div>
+        <div class="chip" id="chip-vatican-tank">
+          <span class="icon" style="background:var(--vatican);border-radius:4px"></span>
+          <span class="name">Tank</span>
+          <span class="count">0</span>
+        </div>
+      </div>
+      <div class="army-boxes">
+        <div class="army-box" data-side="italy">
+          <span class="abox-side">Italy</span>
+          <span class="abox-stat"><i class="ico soldier"></i><b class="ct-soldier">0</b></span>
+          <span class="abox-stat"><i class="ico tank"></i><b class="ct-tank">0</b></span>
+          <span class="abox-total">0</span>
+        </div>
+        <div class="army-box" data-side="vatican">
+          <span class="abox-side">Vatican</span>
+          <span class="abox-stat"><i class="ico soldier"></i><b class="ct-soldier">0</b></span>
+          <span class="abox-stat"><i class="ico tank"></i><b class="ct-tank">0</b></span>
+          <span class="abox-total">0</span>
+        </div>
+      </div>
+      <div id="setup-msg"></div>
+      <button id="start-btn" disabled>Start</button>
+      <div class="hint">Place any number of soldiers and tanks per side, anywhere walkable (both sides may field tanks; only defenders may garrison a basilica/bunker). Italy is highlighted first, then the Vatican. Start needs ≥1 unit each.</div>
+    </div>
+
+    <div id="play" class="hidden">
+      <h2>Battle</h2>
+      <div class="turn">Turn: <b id="turn-label">Italy</b></div>
+      <div class="army-boxes">
+        <div class="army-box" data-side="italy">
+          <span class="abox-side">Italy</span>
+          <span class="abox-stat"><i class="ico soldier"></i><b class="ct-soldier">0</b></span>
+          <span class="abox-stat"><i class="ico tank"></i><b class="ct-tank">0</b></span>
+          <span class="abox-total">0</span>
+        </div>
+        <div class="army-box" data-side="vatican">
+          <span class="abox-side">Vatican</span>
+          <span class="abox-stat"><i class="ico soldier"></i><b class="ct-soldier">0</b></span>
+          <span class="abox-stat"><i class="ico tank"></i><b class="ct-tank">0</b></span>
+          <span class="abox-total">0</span>
+        </div>
+      </div>
+      <div id="sel-info">Click one of your units to select it.</div>
+      <canvas id="wheel" width="170" height="170"></canvas>
+      <button id="wheel-btn" disabled>Turn Wheel</button>
+      <div id="wheel-result"></div>
+      <button id="skip-btn">Skip turn</button>
+      <div class="hint">Select a unit → spin the <b>Turn Wheel</b> → move onto a green tile, then click a highlighted enemy in the red range. <b>Rifle×2 / Tank×2</b> fire twice; <b>Capture</b> turns an enemy tank to your side; <b>Star</b> heals. <b>Skip</b> to pass.</div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
