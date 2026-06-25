@@ -19,6 +19,65 @@
         background: var(--bg);
         color: #222;
       }
+      /* --- Intro / loading splash (cosmetic, pure CSS, fixed ~2s) ---
+         Painted first in <body> so it covers the board immediately on load (no
+         flash of the bare board before the ES modules finish). 100% CSS: the bar
+         fills over 2s, then the overlay fades and goes visibility:hidden so it
+         stops covering / capturing input — a slow or failed main.js can never
+         leave it stuck or reveal it early, and it never blocks the real boot
+         happening underneath. z-index sits above every other overlay. */
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #1a1610 url('./assets/game-intro-image.png') center / cover no-repeat;
+        animation: splashfade 0.55s ease 2s forwards;
+      }
+      @keyframes splashfade {
+        to { opacity: 0; visibility: hidden; }
+      }
+      .splash-loader {
+        position: absolute;
+        bottom: 12vh;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        width: 30vw;
+      }
+      .splash-label {
+        font-size: clamp(14px, 1.6vw, 20px);
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #fff;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+      }
+      .splash-bar {
+        width: 100%;
+        height: 12px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.45);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 2px 10px rgba(0, 0, 0, 0.4);
+        overflow: hidden;
+      }
+      .splash-bar-fill {
+        width: 0;
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--italy), var(--vatican));
+        animation: splashfill 2s linear forwards;
+      }
+      @keyframes splashfill {
+        from { width: 0; }
+        to { width: 100%; }
+      }
+
       #stage { position: fixed; inset: 0; }
       #board {
         display: block;
@@ -270,6 +329,15 @@
     </style>
   </head>
   <body>
+    <!-- Intro / loading splash: painted before the ES module loads so the board
+         never flashes underneath. Fades out via CSS after ~2s; purely cosmetic. -->
+    <div id="splash">
+      <div class="splash-loader">
+        <div class="splash-label">Loading game</div>
+        <div class="splash-bar"><div class="splash-bar-fill"></div></div>
+      </div>
+    </div>
+
     <div id="stage">
       <canvas id="board"></canvas>
     </div>
