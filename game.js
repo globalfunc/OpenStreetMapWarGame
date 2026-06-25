@@ -21,6 +21,7 @@ import {
   isWalkable,
   structureAt,
   reachableTiles,
+  shortestPath,
   attackRadiusTiles,
   hasLineOfSight,
   COLS,
@@ -369,12 +370,21 @@ export function createGame() {
     if (!u) return { ok: false, reason: 'Select one of your units first.' };
     if (state.spinResult == null) return { ok: false, reason: 'Spin the wheel first.' };
     if (state.reachable.has(y * COLS + x)) {
-      // Face the move direction (diagonals included) so the icon's barrel points
-      // where it's heading. Keep the prior heading if it didn't actually move.
-      if (x !== u.x || y !== u.y) u.heading = Math.atan2(y - u.y, x - u.x);
+      // Logic commits to the destination immediately (occupancy/targets/win all
+      // resolve at the final tile). The shortest path is returned so the renderer
+      // can animate the slide; we face the LAST segment's direction so the settled
+      // icon matches where the travel ends (the renderer turns along each segment
+      // en route). Keep the prior heading if it didn't actually move.
+      const path = x !== u.x || y !== u.y ? shortestPath(u.x, u.y, x, y) : null;
+      if (path && path.length >= 2) {
+        const a = path[path.length - 2];
+        const b = path[path.length - 1];
+        u.heading = Math.atan2(b[1] - a[1], b[0] - a[0]);
+      }
       u.x = x;
       u.y = y;
-      return afterMove();
+      const res = afterMove();
+      return { ...res, path };
     }
     // Distinguish "too far" from "in range but blocked/unreachable" (spec §8.1).
     if (distance(u, { x, y }) > moveAllowance(u)) {
@@ -404,6 +414,11 @@ export function createGame() {
     const target = firstLegalTargetOn(x, y);
     if (!target) return { ok: false, reason: 'No valid target there.' };
 
+    // Turn to face the target before the strike (the renderer eases the heading
+    // along the shortest arc; input defers the damage flash until the turn).
+    if (target.x !== u.x || target.y !== u.y) {
+      u.heading = Math.atan2(target.y - u.y, target.x - u.x);
+    }
     applyAction(result, target, u);
     state.shotsLeft--;
     const slain = target.hp <= 0;

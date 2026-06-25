@@ -19,10 +19,20 @@ import {
   DAMAGE_FLASH_COLOR,
   CAPTURE_FLASH_MS,
   HEAL_BUBBLE,
+  TURN_MS,
 } from './config.js';
 import { board, COLS, ROWS } from './board.js';
 import { UNIT } from './units.js';
-import { hpFillRatio, hpBarColor, tweenStep, stackLayout } from './effects.js';
+import {
+  hpFillRatio,
+  hpBarColor,
+  tweenStep,
+  stackLayout,
+  easeAngle,
+  samplePath,
+  segmentHeading,
+  moveDurationMs,
+} from './effects.js';
 import { drawTankIcon, drawSoldierIcon } from './unit-icons.js';
 
 const BOARD_W = COLS * TILE_SIZE;
@@ -187,6 +197,12 @@ export function createRenderer(canvas) {
   // red-tint flashes, floating heal bubbles, and tile-anchored death flashes.
   const displayHp = new Map();   // unit.id → animated HP shown by the bar
   const flashes = new Map();     // unit.id → start time of its red-tint flash
+  // Phase 9 movement/rotation: a per-unit eased heading (turns along the shortest
+  // arc toward the unit's desired facing) and active "travel" tweens that slide a
+  // unit along its shortest path. Logical x/y already sits at the destination; the
+  // travel only animates the *visual* position/heading between tiles.
+  const displayHeading = new Map(); // unit.id → currently rendered heading (rad)
+  const travels = new Map();        // unit.id → { path, start, durationMs }
   const bubbles = [];            // { x, y, start } heal "+" bubbles (world coords)
   const deathFlashes = [];       // { cx, cy, start } red flash on a slain tile
   const captureFlashes = [];     // { cx, cy, start, color } ring on a captured tile
@@ -357,13 +373,68 @@ export function createRenderer(canvas) {
     // Valid targets (spec §8.1): emphasized red over enemy tiles you may strike.
     overlayTiles(targets, COLORS.targetOverlay, COLORS.targetOverlayEdge);
 
+    // Ease a unit's rendered heading toward `desired` along the shortest arc, so
+    // turns (cornering mid-path, the pre-attack aim) are smooth, never snapping or
+    // unwinding the long way. First sight adopts the desired heading outright.
+    const animHeading = (u, desired) => {
+      let h = displayHeading.get(u.id);
+      if (h == null) h = desired;
+      h = easeAngle(h, desired, dt, TURN_MS);
+      displayHeading.set(u.id, h);
+      if (h !== desired) dirty = true;
+      return h;
+    };
+
+    // Draw one unit (icon + hit-flash + HP bar) at a world center, sized iconSize,
+    // facing `heading`. Shared by the settled tile-stack pass and the traveling
+    // (sliding) overlay pass so both render identically.
+    const drawUnit = (u, cx, cy, iconSize, heading) => {
+      const color = SIDE_COLOR[u.side] || '#888';
+
+      // Ease the bar's displayed HP toward the real value (drain/refill).
+      let disp = displayHp.get(u.id);
+      if (disp == null) disp = u.hp; // first sight: no animation
+      disp = tweenStep(disp, u.hp, dt, HP_TWEEN_MS);
+      displayHp.set(u.id, disp);
+      if (disp !== u.hp) dirty = true;
+
+      if (u.type === UNIT.TANK) {
+        if (USE_SVG_ICONS) drawTankIcon(ctx, cx, cy, iconSize, color, heading);
+        else drawTankLegacy(ctx, cx, cy, iconSize, color);
+      } else if (USE_SVG_ICONS) {
+        drawSoldierIcon(ctx, cx, cy, iconSize, color, heading);
+      } else {
+        drawSoldierLegacy(ctx, cx, cy, iconSize, color);
+      }
+
+      // Red-tint flash on a struck unit (fades over DAMAGE_FLASH_MS).
+      const fStart = flashes.get(u.id);
+      if (fStart != null) {
+        const p = (now - fStart) / DAMAGE_FLASH_MS;
+        if (p >= 1) {
+          flashes.delete(u.id);
+        } else {
+          ctx.fillStyle = `rgba(${DAMAGE_FLASH_COLOR}, ${(1 - p) * 0.72})`;
+          ctx.beginPath();
+          ctx.arc(cx, cy, iconSize * 0.46, 0, Math.PI * 2);
+          ctx.fill();
+          dirty = true;
+        }
+      }
+
+      drawHpBar(ctx, cx, cy, iconSize, u.maxHp, disp);
+    };
+
     // Units (spec §8). Group by tile; when 2+ share a tile they're split
-    // side-by-side (no overlap, all clickable) instead of a count badge. Each
-    // unit gets its own icon, an animated HP bar, and a red flash when hit.
+    // side-by-side (no overlap, all clickable) instead of a count badge. A unit
+    // mid-travel is pulled OUT of its destination stack and drawn on top at its
+    // animated position (full size), joining the stack only once it lands.
     if (units.length) {
       const byTile = new Map();
+      const traveling = [];
       for (const u of units) {
         if (u.x == null) continue;
+        if (travels.has(u.id)) { traveling.push(u); continue; }
         const key = u.y * COLS + u.x;
         const slot = byTile.get(key);
         if (slot) slot.push(u);
@@ -378,54 +449,32 @@ export function createRenderer(canvas) {
           const L = layout[i];
           const cx = tx + L.cx * TILE_SIZE;
           const cy = ty + L.cy * TILE_SIZE;
-          const iconSize = L.scale * TILE_SIZE;
-          const color = SIDE_COLOR[u.side] || '#888';
-
-          // Ease the bar's displayed HP toward the real value (drain/refill).
-          let disp = displayHp.get(u.id);
-          if (disp == null) disp = u.hp; // first sight: no animation
-          disp = tweenStep(disp, u.hp, dt, HP_TWEEN_MS);
-          displayHp.set(u.id, disp);
-          if (disp !== u.hp) dirty = true;
-
-          if (u.type === UNIT.TANK) {
-            if (USE_SVG_ICONS) {
-              const heading = u.heading ?? DEFAULT_HEADING[u.side] ?? 0;
-              drawTankIcon(ctx, cx, cy, iconSize, color, heading);
-            } else {
-              drawTankLegacy(ctx, cx, cy, iconSize, color);
-            }
-          } else if (USE_SVG_ICONS) {
-            const heading = u.heading ?? DEFAULT_HEADING[u.side] ?? 0;
-            drawSoldierIcon(ctx, cx, cy, iconSize, color, heading);
-          } else {
-            drawSoldierLegacy(ctx, cx, cy, iconSize, color);
-          }
-
-          // Red-tint flash on a struck unit (fades over DAMAGE_FLASH_MS).
-          const fStart = flashes.get(u.id);
-          if (fStart != null) {
-            const p = (now - fStart) / DAMAGE_FLASH_MS;
-            if (p >= 1) {
-              flashes.delete(u.id);
-            } else {
-              ctx.fillStyle = `rgba(${DAMAGE_FLASH_COLOR}, ${(1 - p) * 0.72})`;
-              ctx.beginPath();
-              ctx.arc(cx, cy, iconSize * 0.46, 0, Math.PI * 2);
-              ctx.fill();
-              dirty = true;
-            }
-          }
-
-          drawHpBar(ctx, cx, cy, iconSize, u.maxHp, disp);
+          const desired = u.heading ?? DEFAULT_HEADING[u.side] ?? 0;
+          drawUnit(u, cx, cy, L.scale * TILE_SIZE, animHeading(u, desired));
         }
       }
-      // Forget displayed-HP/flash state for units no longer on the board.
-      if (displayHp.size > units.length) {
-        const live = new Set(units.map((u) => u.id));
-        for (const id of displayHp.keys()) if (!live.has(id)) displayHp.delete(id);
-        for (const id of flashes.keys()) if (!live.has(id)) flashes.delete(id);
+      // Sliding units on top: interpolate along the path, face the live segment.
+      for (const u of traveling) {
+        const tr = travels.get(u.id);
+        const frac = tr.durationMs > 0 ? (now - tr.start) / tr.durationMs : 1;
+        const sp = samplePath(tr.path, frac);
+        const cx = (sp.x + 0.5) * TILE_SIZE;
+        const cy = (sp.y + 0.5) * TILE_SIZE;
+        const desired = segmentHeading(tr.path, sp.segIndex);
+        drawUnit(u, cx, cy, TILE_SIZE, animHeading(u, desired));
+        if (frac >= 1) travels.delete(u.id); // arrived → rejoins its tile next frame
+        dirty = true; // keep animating while a slide is in flight
       }
+    }
+    // Forget per-unit animation state for units no longer on the board (runs even
+    // when the board is empty, e.g. New Game, so a stale travel can't keep the
+    // input locked). Cheap: the maps only hold live-ish unit ids.
+    if (displayHp.size || flashes.size || displayHeading.size || travels.size) {
+      const live = new Set(units.map((u) => u.id));
+      for (const id of displayHp.keys()) if (!live.has(id)) displayHp.delete(id);
+      for (const id of flashes.keys()) if (!live.has(id)) flashes.delete(id);
+      for (const id of displayHeading.keys()) if (!live.has(id)) displayHeading.delete(id);
+      for (const id of travels.keys()) if (!live.has(id)) travels.delete(id);
     }
 
     // Death flashes (spec §8, optional): a brief red wash on a slain unit's tile,
@@ -492,8 +541,17 @@ export function createRenderer(canvas) {
     // Selection highlight (spec §8): a subtle pulsing ring in the player's color
     // around the selected unit's tile. Drawn on top so it frames the figurine.
     if (selected && selected.x != null) {
-      const cx = (selected.x + 0.5) * TILE_SIZE;
-      const cy = (selected.y + 0.5) * TILE_SIZE;
+      // Follow the icon if the selected unit is mid-slide, else its tile center.
+      let scx = selected.x;
+      let scy = selected.y;
+      const tr = travels.get(selected.id);
+      if (tr) {
+        const sp = samplePath(tr.path, tr.durationMs > 0 ? (now - tr.start) / tr.durationMs : 1);
+        scx = sp.x;
+        scy = sp.y;
+      }
+      const cx = (scx + 0.5) * TILE_SIZE;
+      const cy = (scy + 0.5) * TILE_SIZE;
       const color = SIDE_COLOR[selected.side] || '#fff';
       const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
       ctx.strokeStyle = color;
@@ -635,6 +693,24 @@ export function createRenderer(canvas) {
     dirty = true;
   };
 
+  // --- Phase 9 movement: start a slide of `unit` along `path` (tile coords). The
+  // unit's logical x/y is already at the destination; this only animates the
+  // visual position/heading. Total time scales with path length, clamped to the
+  // cinematic window. A no-op for a trivial/absent path.
+  const animateMove = (unit, path) => {
+    if (!unit || !path || path.length < 2) return;
+    travels.set(unit.id, {
+      path,
+      start: performance.now(),
+      durationMs: moveDurationMs(path.length - 1),
+    });
+    dirty = true;
+  };
+
+  // Is any unit currently sliding? Input uses this to lock the board until the
+  // moving icon arrives (so an attack can't resolve before the unit is in place).
+  const isAnimating = () => travels.size > 0;
+
   // --- Phase 7 one-shot effects (fired by input.js on damage/heal, spec §8) ---
 
   // Red-tint flash on a struck-but-surviving unit; its HP bar drains via tween.
@@ -698,6 +774,8 @@ export function createRenderer(canvas) {
     setAttackRadius,
     setTargets,
     markDirty,
+    animateMove,
+    isAnimating,
     flashUnit,
     deathFlashAt,
     captureFlashAt,

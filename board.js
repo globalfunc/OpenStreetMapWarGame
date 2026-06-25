@@ -166,6 +166,57 @@ export function reachableTiles(startX, startY, allowance) {
   return result;
 }
 
+// Shortest path from (x0,y0) to (x1,y1) over ALLOWED tiles, as a list of tile
+// coords [[x,y], …] including both endpoints (a single-element list if start ==
+// goal), or null if unreachable. BFS with parent pointers; it reuses the EXACT
+// same 8-direction expansion and no-corner-cutting rule as reachableTiles, so any
+// tile in a unit's reachable set is guaranteed a path here, and the route never
+// squeezes through a blocked wall corner. Uniform step cost ⇒ BFS yields a
+// minimal-step path; it naturally hugs walls and threads gates (gates are
+// walkable). The endpoints must be walkable; intermediate tiles always are.
+export function shortestPath(x0, y0, x1, y1) {
+  if (!inBounds(x0, y0) || !inBounds(x1, y1)) return null;
+  if (!isWalkable(x0, y0) || !isWalkable(x1, y1)) return null;
+  if (x0 === x1 && y0 === y1) return [[x0, y0]];
+  const goalKey = y1 * COLS + x1;
+  const parent = new Map();
+  parent.set(y0 * COLS + x0, -1); // -1 marks the start (no parent)
+  let frontier = [[x0, y0]];
+  let found = false;
+  while (frontier.length && !found) {
+    const next = [];
+    for (const [x, y] of frontier) {
+      for (const [dx, dy] of DIRS) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (!inBounds(nx, ny)) continue;
+        const key = ny * COLS + nx;
+        if (parent.has(key)) continue;
+        if (!isWalkable(nx, ny)) continue;
+        // Same corner rule as reachableTiles: a diagonal needs one open orthogonal.
+        if (dx !== 0 && dy !== 0 && !isWalkable(x + dx, y) && !isWalkable(x, y + dy)) {
+          continue;
+        }
+        parent.set(key, y * COLS + x);
+        if (key === goalKey) { found = true; break; }
+        next.push([nx, ny]);
+      }
+      if (found) break;
+    }
+    frontier = next;
+  }
+  if (!parent.has(goalKey)) return null;
+  // Walk parent pointers back from the goal, then reverse into start→goal order.
+  const path = [];
+  let cur = goalKey;
+  while (cur !== -1) {
+    path.push([cur % COLS, Math.floor(cur / COLS)]);
+    cur = parent.get(cur);
+  }
+  path.reverse();
+  return path;
+}
+
 // --- Phase 5: line of sight + attack radius (spec §6, §8.1) ---
 
 // Supercover line between two tiles: every grid cell the straight segment from

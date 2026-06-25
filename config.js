@@ -154,6 +154,16 @@ export const DAMAGE_FLASH_COLOR = '220, 40, 30'; // rgb; alpha is animated
 // over the captured tank's tile.
 export const CAPTURE_FLASH_MS = 650;
 
+// Movement/rotation animation (render.js visual layer). A unit slides along its
+// shortest path at a constant tiles/sec, with the total A→B time clamped to a
+// cinematic window so short hops aren't instant and long dashes aren't a blur.
+// TURN_MS is the heading-ease time-constant — used both for cornering mid-path
+// and for the "aim" turn before an attack (a quick, shortest-arc rotation).
+export const MOVE_PER_TILE_MS = 280; // travel time per path step (pre-clamp)
+export const MOVE_MIN_MS = 2500;     // floor: even a 1-tile move is deliberate
+export const MOVE_MAX_MS = 3500;     // cap: a full-allowance dash tops out here
+export const TURN_MS = 200;          // heading ease (~quick aim turn / cornering)
+
 // Heal "+"-in-circle bubbles floating up from the unit on a green star (spec §8).
 export const HEAL_BUBBLE = {
   count: 3,          // bubbles per heal

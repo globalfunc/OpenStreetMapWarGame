@@ -3,9 +3,19 @@
 // so tools/probe-phase7.mjs can exercise the math directly in Node, and so the
 // renderer just consumes the numbers.
 
-import { HPBAR, HP_TWEEN_MS, STACK } from './config.js';
+import {
+  HPBAR,
+  HP_TWEEN_MS,
+  STACK,
+  TURN_MS,
+  MOVE_PER_TILE_MS,
+  MOVE_MIN_MS,
+  MOVE_MAX_MS,
+} from './config.js';
 
 export const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+const TAU = Math.PI * 2;
 
 // HP-bar fill as a fraction [0,1], snapped to WHOLE HP points (spec §8): the bar
 // reads in discrete steps of one HP — soldier = 10 steps of 10%, tank = 30 steps
@@ -40,6 +50,86 @@ export function tweenStep(current, target, dtMs, durationMs = HP_TWEEN_MS) {
   const next = current + (target - current) * k;
   if (Math.abs(target - next) < 0.01) return target; // essentially arrived
   return next;
+}
+
+// --- Phase 9: movement/rotation animation math (pure; render.js consumes it) ---
+
+// Smallest signed rotation from angle `from` to angle `to`, in (−π, π]. Lets the
+// renderer turn along the SHORTEST arc instead of unwinding the long way around
+// when headings wrap past ±π. e.g. from 170° to −170° returns +20°, not −340°.
+export function shortestAngleDelta(from, to) {
+  let d = (to - from) % TAU;
+  if (d > Math.PI) d -= TAU;
+  if (d <= -Math.PI) d += TAU;
+  return d;
+}
+
+// One eased step of a heading tween toward `target`, along the shortest arc — the
+// angular twin of tweenStep, so cornering mid-path and the pre-attack aim turn
+// both decelerate (ease-out) and never overshoot. Snaps within a small epsilon so
+// it converges; over ~`durationMs` it closes ~99.9% of the remaining angle.
+export function easeAngle(current, target, dtMs, durationMs = TURN_MS) {
+  if (durationMs <= 0) return target;
+  const diff = shortestAngleDelta(current, target);
+  if (diff === 0) return target;
+  const k = 1 - Math.pow(0.001, clamp(dtMs, 0, durationMs) / durationMs);
+  const next = current + diff * k;
+  if (Math.abs(diff * (1 - k)) < 0.001) return target; // essentially aligned
+  return next;
+}
+
+// Total travel time for a path of `stepCount` segments (path.length − 1): constant
+// tiles/sec, clamped to the cinematic [MOVE_MIN_MS, MOVE_MAX_MS] window so a 1-tile
+// hop still feels deliberate and a full-allowance dash doesn't blur past.
+export function moveDurationMs(stepCount) {
+  return clamp(stepCount * MOVE_PER_TILE_MS, MOVE_MIN_MS, MOVE_MAX_MS);
+}
+
+// Position along a tile polyline at fraction `frac` ∈ [0,1], by CUMULATIVE EDGE
+// LENGTH (so a diagonal segment, being longer, takes proportionally longer — the
+// unit moves at constant world speed, not constant per-segment time). `path` is a
+// list of [x,y] tile coords. Returns { x, y, segIndex }: the interpolated point
+// and the index of the segment it's on (its direction = that segment's heading).
+export function samplePath(path, frac) {
+  if (!path || path.length === 0) return { x: 0, y: 0, segIndex: 0 };
+  if (path.length === 1) return { x: path[0][0], y: path[0][1], segIndex: 0 };
+  // Edge lengths + total.
+  const segLen = [];
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    const dx = path[i][0] - path[i - 1][0];
+    const dy = path[i][1] - path[i - 1][1];
+    const len = Math.hypot(dx, dy);
+    segLen.push(len);
+    total += len;
+  }
+  const f = clamp(frac, 0, 1);
+  if (f <= 0) return { x: path[0][0], y: path[0][1], segIndex: 0 };
+  if (f >= 1) {
+    const n = path.length - 1;
+    return { x: path[n][0], y: path[n][1], segIndex: n - 1 };
+  }
+  let target = f * total;
+  for (let i = 0; i < segLen.length; i++) {
+    if (target <= segLen[i] || i === segLen.length - 1) {
+      const t = segLen[i] > 0 ? target / segLen[i] : 0;
+      return {
+        x: path[i][0] + (path[i + 1][0] - path[i][0]) * t,
+        y: path[i][1] + (path[i + 1][1] - path[i][1]) * t,
+        segIndex: i,
+      };
+    }
+    target -= segLen[i];
+  }
+  const n = path.length - 1;
+  return { x: path[n][0], y: path[n][1], segIndex: n - 1 };
+}
+
+// Heading (radians, 0 = east) of path segment `i` = direction from vertex i→i+1.
+export function segmentHeading(path, i) {
+  const a = path[Math.min(i, path.length - 2)];
+  const b = path[Math.min(i + 1, path.length - 1)];
+  return Math.atan2(b[1] - a[1], b[0] - a[0]);
 }
 
 // Split layout for `n` units sharing one tile (spec §8): a tidy grid of equal

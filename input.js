@@ -10,7 +10,8 @@
 // panning still works on empty tiles: a pan-guard tells the renderer not to pan
 // when the pointer goes down on a placed unit.
 
-import { SIDE, STAR_HEAL } from './config.js';
+import { SIDE, STAR_HEAL, TURN_MS } from './config.js';
+import { COLS } from './board.js';
 import { UNIT } from './units.js';
 import { PHASE, TURN } from './game.js';
 import { createWheel } from './wheel.js';
@@ -180,6 +181,13 @@ export function createInput({ canvas, renderer, game, onPhaseChange }) {
   // A click is a pointerdown+up with little movement; larger movement is a pan
   // (handled by the renderer), so selection and panning coexist on every tile.
   let playDown = null;
+  // True while an attack's brief "aim" turn is mid-flight (the heading is easing
+  // to face the target before the strike resolves). Combined with the renderer's
+  // travel animation, this gates board input so a click can't land while a unit
+  // is still sliding or turning.
+  let strikePending = false;
+  const inputLocked = () => renderer.isAnimating() || strikePending;
+
   function onPlayDown(e) {
     if (game.phase !== PHASE.PLAYING || e.button !== 0) return;
     playDown = { x: e.clientX, y: e.clientY };
@@ -190,6 +198,7 @@ export function createInput({ canvas, renderer, game, onPhaseChange }) {
     playDown = null;
     if (moved > 6) return; // a drag/pan, not a click
     if (wheel && wheel.spinning) return; // ignore board clicks during a spin
+    if (inputLocked()) return; // a unit is sliding / turning — wait for it
     handlePlayClick(e.clientX, e.clientY);
   }
 
@@ -202,6 +211,33 @@ export function createInput({ canvas, renderer, game, onPhaseChange }) {
     return stack[pickStackSlot(cell.fx, cell.fy, stack.length)];
   }
 
+  // Resolve one shot of the TARGET step against tile (x,y) and surface feedback
+  // (capture flourish / death flash / hit flash, mid-volley "shots left" hint, or
+  // a rejection toast). Split out so it can run immediately on a miss or be
+  // deferred behind the brief aim turn on a hit.
+  function resolveAttack(x, y) {
+    const res = game.tryAttack(x, y);
+    if (!res.ok) {
+      showToast(res.reason);
+      refreshPlay();
+      return;
+    }
+    if (res.captured) {
+      renderer.captureFlashAt(res.target.x, res.target.y, res.target.side);
+      showToast('Tank captured — it switches to your side!');
+    } else if (res.slain) {
+      renderer.deathFlashAt(res.target.x, res.target.y); // already reaped
+    } else {
+      renderer.flashUnit(res.target.id); // survivor: bar drains via tween
+    }
+    // Mid-volley: another shot remains and a target exists — prompt for it.
+    if (!res.done && res.shotsLeft != null) {
+      const n = res.shotsLeft;
+      showToast(`Hit! ${n} shot${n === 1 ? '' : 's'} left — pick a target.`);
+    }
+    refreshPlay();
+  }
+
   function handlePlayClick(clientX, clientY) {
     const tile = renderer.screenToCell(clientX, clientY);
     if (!tile) return;
@@ -212,26 +248,24 @@ export function createInput({ canvas, renderer, game, onPhaseChange }) {
     // Part F/G: the ×2s fire twice (feedback per shot, "shots left" hint); capture
     // flips a tank (recolor flourish, no damage flash).
     if (game.turnStep === TURN.TARGET) {
-      const res = game.tryAttack(tile.x, tile.y);
-      if (!res.ok) {
-        showToast(res.reason);
-        refreshPlay();
+      // A click that will land a shot: turn the barrel to face the target first
+      // (the renderer eases the heading along the shortest arc), then resolve the
+      // strike after TURN_MS so it reads as "aim, then fire". The board is locked
+      // during that brief turn. A miss resolves at once so the toast can explain.
+      if (game.targets.has(tile.y * COLS + tile.x)) {
+        const attacker = game.selected;
+        if (attacker && (tile.x !== attacker.x || tile.y !== attacker.y)) {
+          attacker.heading = Math.atan2(tile.y - attacker.y, tile.x - attacker.x);
+          renderer.markDirty();
+        }
+        strikePending = true;
+        setTimeout(() => {
+          strikePending = false;
+          resolveAttack(tile.x, tile.y);
+        }, TURN_MS);
         return;
       }
-      if (res.captured) {
-        renderer.captureFlashAt(res.target.x, res.target.y, res.target.side);
-        showToast('Tank captured — it switches to your side!');
-      } else if (res.slain) {
-        renderer.deathFlashAt(res.target.x, res.target.y); // already reaped
-      } else {
-        renderer.flashUnit(res.target.id); // survivor: bar drains via tween
-      }
-      // Mid-volley: another shot remains and a target exists — prompt for it.
-      if (!res.done && res.shotsLeft != null) {
-        const n = res.shotsLeft;
-        showToast(`Hit! ${n} shot${n === 1 ? '' : 's'} left — pick a target.`);
-      }
-      refreshPlay();
+      resolveAttack(tile.x, tile.y);
       return;
     }
 
@@ -252,12 +286,17 @@ export function createInput({ canvas, renderer, game, onPhaseChange }) {
       return;
     }
 
-    // 2. With a selection, try to move to the clicked tile (toast if illegal). An
-    // attack with no legal target even after moving is forfeited (spec §6).
+    // 2. With a selection, try to move to the clicked tile (toast if illegal). On
+    // success the unit slides along its shortest path (renderer.animateMove); the
+    // logical position is already at the destination. An attack with no legal
+    // target even after moving is forfeited (spec §6).
     if (selected) {
       const res = game.tryMove(tile.x, tile.y);
       if (!res.ok) showToast(res.reason);
-      else if (res.forfeited) showToast('No valid target in range — attack forfeited.');
+      else {
+        if (res.path) renderer.animateMove(selected, res.path);
+        if (res.forfeited) showToast('No valid target in range — attack forfeited.');
+      }
       refreshPlay();
       return;
     }
@@ -478,6 +517,7 @@ export function createInput({ canvas, renderer, game, onPhaseChange }) {
   function onSkip() {
     if (game.phase !== PHASE.PLAYING) return;
     if (wheel && wheel.spinning) return; // don't pass the turn mid-spin
+    if (inputLocked()) return; // wait for a sliding/turning unit to settle
     game.skipTurn();
     refreshPlay();
   }
