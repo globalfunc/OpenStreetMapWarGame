@@ -23,7 +23,7 @@ import {
 import { board, COLS, ROWS } from './board.js';
 import { UNIT } from './units.js';
 import { hpFillRatio, hpBarColor, tweenStep, stackLayout } from './effects.js';
-import { drawTankIcon } from './unit-icons.js';
+import { drawTankIcon, drawSoldierIcon } from './unit-icons.js';
 
 const BOARD_W = COLS * TILE_SIZE;
 const BOARD_H = ROWS * TILE_SIZE;
@@ -395,6 +395,9 @@ export function createRenderer(canvas) {
             } else {
               drawTankLegacy(ctx, cx, cy, iconSize, color);
             }
+          } else if (USE_SVG_ICONS) {
+            const heading = u.heading ?? DEFAULT_HEADING[u.side] ?? 0;
+            drawSoldierIcon(ctx, cx, cy, iconSize, color, heading);
           } else {
             drawSoldierLegacy(ctx, cx, cy, iconSize, color);
           }

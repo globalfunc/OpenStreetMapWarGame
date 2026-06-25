@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"
+     style="--accent:#e8c61e">
+  <!-- Premium top-down infantry soldier (Vatican Game unit icon).
+       Canonical heading: rifle points RIGHT (+x / east); the game rotates the
+       whole icon to the unit's movement direction.
+       Organic bird's-eye silhouette: rounded helmet (accent) + globe grid, slim
+       rounded shoulders (skewed firing stance), a backpack hump behind, the
+       support arm cupping the rifle from below (grip hidden), and the bent
+       trigger arm (~90° elbow, small hollow triangle) on the pistol grip.
+       Path data is identical to unit-icons.js — keep both in sync.
+       Palette: backpack #2b3037, body/arms #3a4047, stock #454c54,
+       dark #202428. Draw order = rear to front (helmet last). -->
+  <g stroke-linejoin="round" stroke-linecap="round" fill="none">
+    <!-- Backpack hump (rear) + seam -->
+    <path d="M9,11 Q4.5,11.5 4.5,16 Q4.5,20.5 9,21 Q10,16 9,11 Z" fill="#2b3037" stroke="rgba(0,0,0,0.72)" stroke-width="0.5"/>
+    <path d="M6,13 Q5.4,16 6,19" stroke="rgba(0,0,0,0.55)" stroke-width="0.35"/>
+
+    <!-- Slim rounded shoulders / body (skewed firing stance) + soft seams -->
+    <path d="M11,8.8 Q15,7.8 18.5,9.2 Q20.2,11 19.7,14.5 L19,18 Q18,21 14.5,23.2 Q12,24.2 10,22.6 Q8.4,20 8.7,15.8 Q8.4,11.8 11,8.8 Z" fill="#3a4047" stroke="rgba(0,0,0,0.72)" stroke-width="0.5"/>
+    <path d="M9.6,10 Q13,8.8 16.8,9.8 M9.6,21.4 Q12.2,23 14.8,22" stroke="rgba(0,0,0,0.55)" stroke-width="0.35"/>
+
+    <!-- Support arm cupping the rifle from below (drawn before the rifle so the
+         barrel hides the grip); extended ~135° elbow -->
+    <path d="M17,11 L23.5,12.5 L27.5,18.5" stroke="rgba(0,0,0,0.72)" stroke-width="2.8"/>
+    <path d="M17,11 L23.5,12.5 L27.5,18.5" stroke="#3a4047" stroke-width="2.1"/>
+
+    <!-- Rifle: stock + receiver + magazine + barrel + muzzle + accent collar -->
+    <path d="M12.5,17 H16.5 V19.2 H12.5 Z" fill="#454c54" stroke="rgba(0,0,0,0.72)" stroke-width="0.4"/>
+    <path d="M16,16.8 H20.5 V19.6 H16 Z" fill="#202428" stroke="rgba(0,0,0,0.72)" stroke-width="0.4"/>
+    <path d="M18.4,19.3 L20,19.3 L20.4,22 L18.8,22.2 Z" fill="#202428"/>
+    <path d="M20.5,17.5 H29.8 V18.9 H20.5 Z" fill="#202428" stroke="rgba(0,0,0,0.72)" stroke-width="0.4"/>
+    <path d="M29.8,17.7 H31.4 V18.7 H29.8 Z" fill="#202428" stroke="rgba(0,0,0,0.72)" stroke-width="0.4"/>
+    <path d="M20.1,17.2 H21.3 V19.1 H20.1 Z" fill="var(--accent)"/>
+
+    <!-- Trigger arm as a rounded tube (dark outline under, gunmetal over); the
+         ~90° elbow leaves a small hollow triangle between upper and lower arm -->
+    <path d="M12.5,21.5 L16,25 L19,21.5" stroke="rgba(0,0,0,0.72)" stroke-width="3"/>
+    <path d="M12.5,21.5 L16,25 L19,21.5" stroke="#3a4047" stroke-width="2.3"/>
+    <!-- Trigger hand on the pistol grip -->
+    <path d="M18,20.5 H20 V22.5 H18 Z" fill="#202428"/>
+
+    <!-- Helmet (accent) + curved lat/long "globe" grid (clipped to the dome,
+         spaced by equal sphere-angle so cells foreshorten → 3D spherical read) -->
+    <clipPath id="helmetClip"><path d="M17.9,15.5 A3.9,3.9 0 1 1 10.1,15.5 A3.9,3.9 0 1 1 17.9,15.5 Z"/></clipPath>
+    <path d="M17.9,15.5 A3.9,3.9 0 1 1 10.1,15.5 A3.9,3.9 0 1 1 17.9,15.5 Z" fill="var(--accent)" stroke="rgba(0,0,0,0.72)" stroke-width="0.5"/>
+    <path clip-path="url(#helmetClip)" d="M14,11.6 L14,19.4 M14,11.75 Q9.5,15.5 14,19.25 M14,11.75 Q18.5,15.5 14,19.25 M10.3,15.5 L17.7,15.5 M10.81,13.26 Q14,11.54 17.19,13.26 M10.81,17.74 Q14,19.46 17.19,17.74" stroke="rgba(0,0,0,0.55)" stroke-width="0.35"/>
+  </g>
+</svg>
