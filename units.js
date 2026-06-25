@@ -18,9 +18,13 @@ export const UNIT = { SOLDIER: 'soldier', TANK: 'tank' };
 let nextId = 1;
 
 // Create a unit. x/y default to null (unplaced); the setup phase assigns them.
+// `heading` (radians, 0 = facing east) orients the rendered icon; it defaults to
+// the side's attack direction — Italy north (-π/2), Vatican south (+π/2) — and is
+// updated to the movement direction on each move (see game.js tryMove).
 export function createUnit(side, type, x = null, y = null) {
   const maxHp = type === UNIT.TANK ? TANK_HP : SOLDIER_HP;
-  return { id: nextId++, side, type, hp: maxHp, maxHp, x, y };
+  const heading = side === SIDE.VATICAN ? Math.PI / 2 : -Math.PI / 2;
+  return { id: nextId++, side, type, hp: maxHp, maxHp, x, y, heading };
 }
 
 // Phase 8 Part A: after restoring saved units, advance the id counter past the

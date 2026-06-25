@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"
+     style="--accent:#e8c61e">
+  <!-- BACKUP: SVG snapshot of the ORIGINAL procedural canvas tank (render.js
+       drawTankLegacy): a side-profile hull + turret + barrel, fully tinted in
+       the army color. Kept for reference / quick rollback. Barrel points east. -->
+  <g stroke-linejoin="round" stroke-linecap="round">
+    <!-- hull -->
+    <rect x="4.48" y="15.36" width="23.04" height="9.6" rx="2.56"
+          fill="var(--accent)" stroke="rgba(0,0,0,0.6)" stroke-width="1.92"/>
+    <!-- turret -->
+    <rect x="10.24" y="8.96" width="10.88" height="7.04" rx="1.92"
+          fill="var(--accent)" stroke="rgba(0,0,0,0.6)" stroke-width="1.92"/>
+    <!-- barrel -->
+    <line x1="19.2" y1="12.16" x2="30.72" y2="12.16"
+          stroke="rgba(30,22,12,0.9)" stroke-width="2.88"/>
+  </g>
+</svg>

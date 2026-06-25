@@ -23,6 +23,7 @@ import {
 import { board, COLS, ROWS } from './board.js';
 import { UNIT } from './units.js';
 import { hpFillRatio, hpBarColor, tweenStep, stackLayout } from './effects.js';
+import { drawTankIcon } from './unit-icons.js';
 
 const BOARD_W = COLS * TILE_SIZE;
 const BOARD_H = ROWS * TILE_SIZE;
@@ -30,6 +31,15 @@ const BOARD_H = ROWS * TILE_SIZE;
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
 const SIDE_COLOR = { [SIDE.ITALY]: COLORS.italy, [SIDE.VATICAN]: COLORS.vatican };
+
+// Use the premium SVG-sourced vector icons (unit-icons.js). Flip to false to
+// fall back to the original procedural icons (drawTankLegacy/drawSoldierLegacy).
+const USE_SVG_ICONS = true;
+
+// Default heading per side when a unit hasn't moved yet (or was restored without
+// one): Italy attacks north (barrel up), Vatican defends south (barrel down).
+// 0 = barrel east; canvas rotate is clockwise-positive (screen y is down).
+const DEFAULT_HEADING = { [SIDE.ITALY]: -Math.PI / 2, [SIDE.VATICAN]: Math.PI / 2 };
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -41,8 +51,9 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// Legacy procedural icons (kept as backup; used when USE_SVG_ICONS is false).
 // Flat soldier silhouette (head + body + rifle), tinted by side.
-function drawSoldier(ctx, cx, cy, s, color) {
+function drawSoldierLegacy(ctx, cx, cy, s, color) {
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.strokeStyle = 'rgba(0,0,0,0.55)';
@@ -68,7 +79,7 @@ function drawSoldier(ctx, cx, cy, s, color) {
 }
 
 // Side-profile tank silhouette (hull + turret + barrel), tinted by side.
-function drawTank(ctx, cx, cy, s, color) {
+function drawTankLegacy(ctx, cx, cy, s, color) {
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.fillStyle = color;
@@ -377,8 +388,16 @@ export function createRenderer(canvas) {
           displayHp.set(u.id, disp);
           if (disp !== u.hp) dirty = true;
 
-          if (u.type === UNIT.TANK) drawTank(ctx, cx, cy, iconSize, color);
-          else drawSoldier(ctx, cx, cy, iconSize, color);
+          if (u.type === UNIT.TANK) {
+            if (USE_SVG_ICONS) {
+              const heading = u.heading ?? DEFAULT_HEADING[u.side] ?? 0;
+              drawTankIcon(ctx, cx, cy, iconSize, color, heading);
+            } else {
+              drawTankLegacy(ctx, cx, cy, iconSize, color);
+            }
+          } else {
+            drawSoldierLegacy(ctx, cx, cy, iconSize, color);
+          }
 
           // Red-tint flash on a struck unit (fades over DAMAGE_FLASH_MS).
           const fStart = flashes.get(u.id);

@@ -369,6 +369,9 @@ export function createGame() {
     if (!u) return { ok: false, reason: 'Select one of your units first.' };
     if (state.spinResult == null) return { ok: false, reason: 'Spin the wheel first.' };
     if (state.reachable.has(y * COLS + x)) {
+      // Face the move direction (diagonals included) so the icon's barrel points
+      // where it's heading. Keep the prior heading if it didn't actually move.
+      if (x !== u.x || y !== u.y) u.heading = Math.atan2(y - u.y, x - u.x);
       u.x = x;
       u.y = y;
       return afterMove();

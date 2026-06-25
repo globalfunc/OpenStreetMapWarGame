@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"
+     style="--accent:#e8c61e">
+  <!-- Premium top-down main battle tank (Vatican Game unit icon).
+       Canonical heading: barrel points RIGHT (+x / east); the game rotates the
+       whole icon to the unit's movement direction.
+       Flat gunmetal silhouette + dark engraved lines, accented with the army
+       color (turret trim, hatch rings, barrel collars, glacis chevron).
+       Path data is identical to unit-icons.js — keep both in sync.
+       Palette: track #2b3037, hull #3a4047, turret #454c54, dark #202428. -->
+  <g stroke-linejoin="round" stroke-linecap="round" fill="none">
+    <!-- Tracks + tread ticks -->
+    <path d="M4,4.5 H27 V9 H4 Z M4,23 H27 V27.5 H4 Z" fill="#2b3037" stroke="rgba(0,0,0,0.72)" stroke-width="0.4"/>
+    <path d="M6,4.5 V9 M6,23 V27.5 M8,4.5 V9 M8,23 V27.5 M10,4.5 V9 M10,23 V27.5 M12,4.5 V9 M12,23 V27.5 M14,4.5 V9 M14,23 V27.5 M16,4.5 V9 M16,23 V27.5 M18,4.5 V9 M18,23 V27.5 M20,4.5 V9 M20,23 V27.5 M22,4.5 V9 M22,23 V27.5 M24,4.5 V9 M24,23 V27.5 M26,4.5 V9 M26,23 V27.5" stroke="#202428" stroke-width="0.3"/>
+
+    <!-- Hull + engine deck + seams + glacis chevron -->
+    <path d="M5,8 L21,8 L26,11 L26,21 L21,24 L5,24 Z" fill="#3a4047" stroke="rgba(0,0,0,0.72)" stroke-width="0.5"/>
+    <path d="M5.8,9.8 H8.8 V11 H5.8 Z M5.8,12 H8.8 V13.2 H5.8 Z M5.8,14.2 H8.8 V15.4 H5.8 Z M5.8,16.6 H8.8 V17.8 H5.8 Z M5.8,18.8 H8.8 V20 H5.8 Z M5.8,21 H8.8 V22.2 H5.8 Z M4.4,8.4 H6 V10 H4.4 Z M4.4,22 H6 V23.6 H4.4 Z" fill="#202428"/>
+    <path d="M5,12 H21 M5,20 H21 M21,9 L24,12 M21,23 L24,20" stroke="rgba(0,0,0,0.55)" stroke-width="0.35"/>
+    <path d="M21.5,12.5 L25,16 L21.5,19.5" stroke="var(--accent)" stroke-width="0.7"/>
+
+    <!-- Gun: barrel + accent collars + mantlet -->
+    <path d="M24,15 H31 V17 H24 Z" fill="#202428" stroke="rgba(0,0,0,0.72)" stroke-width="0.4"/>
+    <path d="M25.2,14 H26.4 V18 H25.2 Z M27.6,14 H28.8 V18 H27.6 Z" fill="var(--accent)"/>
+    <path d="M20.5,13.5 H24 V18.5 H20.5 Z" fill="#454c54" stroke="rgba(0,0,0,0.72)" stroke-width="0.4"/>
+
+    <!-- Turret + accent trim ring -->
+    <path d="M22,16 L20,11 L14,10 L10,12.5 L9,16 L10,19.5 L14,22 L20,21 Z" fill="#454c54" stroke="rgba(0,0,0,0.72)" stroke-width="0.5"/>
+    <path d="M22,16 L20,11 L14,10 L10,12.5 L9,16 L10,19.5 L14,22 L20,21 Z" fill="none" stroke="var(--accent)" stroke-width="0.5"/>
+
+    <!-- Optics, hatches, periscopes -->
+    <path d="M18,15 H20 V17 H18 Z" fill="#202428" stroke="var(--accent)" stroke-width="0.35"/>
+    <path d="M14.7,18.6 A2.2,2.2 0 1 1 10.3,18.6 A2.2,2.2 0 1 1 14.7,18.6 Z M14.5,13 A1.7,1.7 0 1 1 11.1,13 A1.7,1.7 0 1 1 14.5,13 Z" fill="#202428" stroke="var(--accent)" stroke-width="0.5"/>
+    <path d="M14,17.6 h1 v1 h-1 Z M13,20 h1 v1 h-1 Z M10.6,18.8 h0.9 v0.9 h-0.9 Z" fill="#202428"/>
+  </g>
+</svg>
