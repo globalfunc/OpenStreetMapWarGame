@@ -4,6 +4,7 @@
 import { createRenderer } from './render.js';
 import { createGame } from './game.js';
 import { createInput } from './input.js';
+import { createVictory } from './victory.js';
 import { loadState } from './storage.js';
 
 const canvas = document.getElementById('board');
@@ -18,13 +19,18 @@ const game = createGame();
 // before the first frame.
 const saved = loadState();
 if (saved) game.restore(saved);
+
+// Phase 6 victory screen (spec §9): a full-screen overlay shown on GAME_OVER.
+// Driven purely by the onPhaseChange seam below — it shows for the winner and
+// hides on any other phase (so Start / New Game dismiss it automatically). A
+// restored finished game surfaces it via input.init() → applyPhaseUI(GAME_OVER).
+const victory = createVictory(game);
+
 const input = createInput({
   canvas,
   renderer,
   game,
-  onPhaseChange: () => {
-    /* input.js drives the turn flow; hook reserved for later phases. */
-  },
+  onPhaseChange: (phase) => victory.sync(phase),
 });
 
 function onResize() {

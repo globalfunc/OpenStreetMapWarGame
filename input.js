@@ -537,6 +537,9 @@ export function createInput({ canvas, renderer, game, onPhaseChange }) {
     startBtn?.addEventListener('click', onStart);
     skipBtn?.addEventListener('click', onSkip);
     el('new-game-btn')?.addEventListener('click', onNewGame);
+    // Victory screen's New Game button reuses the exact same reset flow; its
+    // applyPhaseUI(SETUP) fires onPhaseChange → the victory overlay hides itself.
+    el('victory-new-game')?.addEventListener('click', onNewGame);
     if (wheelCanvas) wheel = createWheel(wheelCanvas, { onResult: onWheelResult });
     wheelBtn?.addEventListener('click', onWheelSpin);
     // Show the panel for the current phase (handles a restored PLAYING game).

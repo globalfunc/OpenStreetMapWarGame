@@ -326,6 +326,102 @@
       }
       .ghost.soldier { border-radius: 50%; }
       .ghost.tank { border-radius: 5px; }
+
+      /* --- Victory screen (Phase 6, spec §9) --- */
+      /* Full-screen celebratory overlay shown on GAME_OVER: the winner's flag as
+         the backdrop, a dimming scrim so text/button read, side-margin confetti,
+         the §9 message, and a big bottom-center New Game button. Toggled via the
+         shared `hidden` class (driven by victory.js / onPhaseChange). Sits below
+         the intro splash (z 1000) so a restored finished game shows splash → fade
+         → victory underneath. */
+      #victory {
+        position: fixed;
+        inset: 0;
+        z-index: 900;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        --win-color: var(--italy);
+      }
+      #victory.hidden { display: none; }
+      #victory-flag {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      #victory-scrim {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(120% 100% at 50% 40%, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.62) 100%),
+          linear-gradient(rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.5));
+      }
+      /* Confetti side bands: pinned to the far left/right margins so the falling
+         stripes never cover the centered message/button. */
+      .confetti-col {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 9vw;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      #victory-confetti-left { left: 0; }
+      #victory-confetti-right { right: 0; }
+      .confetti-stripe {
+        position: absolute;
+        top: -8vh;
+        left: var(--x);
+        width: var(--w);
+        height: var(--h);
+        border-radius: 2px;
+        opacity: 0.92;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+        animation: confetti-fall var(--dur) linear var(--delay) infinite;
+      }
+      @keyframes confetti-fall {
+        0% { transform: translate(0, -8vh) rotate(0deg); }
+        100% { transform: translate(var(--sway), 112vh) rotate(var(--spin)); }
+      }
+      #victory-content {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+        height: 100%;
+        padding: 12vh 6vw 8vh;
+        text-align: center;
+        pointer-events: none; /* let only the button take clicks */
+      }
+      #victory-message {
+        margin: 0;
+        max-width: 16em;
+        font-size: clamp(28px, 5vw, 64px);
+        font-weight: 800;
+        line-height: 1.1;
+        color: #fff;
+        text-shadow: 0 3px 16px rgba(0, 0, 0, 0.7), 0 0 2px rgba(0, 0, 0, 0.6);
+      }
+      #victory-new-game {
+        pointer-events: auto;
+        border: 0;
+        border-radius: 14px;
+        padding: 18px 48px;
+        font-size: clamp(18px, 2.4vw, 30px);
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        color: #fff;
+        cursor: pointer;
+        background: var(--win-color);
+        box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45), inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+        transition: transform 0.12s ease, filter 0.12s ease;
+      }
+      #victory-new-game:hover { transform: translateY(-2px); filter: brightness(1.08); }
+      #victory-new-game:active { transform: translateY(0); }
     </style>
   </head>
   <body>
@@ -435,6 +531,20 @@
     </div>
 
     <div id="toast"></div>
+
+    <!-- Victory screen (Phase 6, spec §9): hidden until GAME_OVER. victory.js
+         fills the flag + message + confetti for the winner; the New Game button
+         is wired to the existing onNewGame flow in input.js. -->
+    <div id="victory" class="hidden">
+      <img id="victory-flag" alt="" />
+      <div id="victory-scrim"></div>
+      <div id="victory-confetti-left" class="confetti-col"></div>
+      <div id="victory-confetti-right" class="confetti-col"></div>
+      <div id="victory-content">
+        <h1 id="victory-message"></h1>
+        <button id="victory-new-game">New Game</button>
+      </div>
+    </div>
 
     <script type="module" src="./main.js"></script>
   </body>
